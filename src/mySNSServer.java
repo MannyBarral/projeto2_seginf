@@ -91,20 +91,20 @@ public class mySNSServer {
 						break;
 					}
 
-					File dir = new File(userUte);
-					if (!dir.exists()){
-						// Create the directory and all parent directories if they don't exist
-						boolean created = dir.mkdirs();
-						if (created) {
-							System.out.println("Directory created successfully.");
-						} else {
-							System.out.println("Failed to create directory.");
-						}
-					} else {
-						System.out.println("Directory already exists.");
-					}
-
 					if (op.equals("-sc")){
+						//Verifica/cria dir cliente
+						File dir = new File(userUte);
+						if (!dir.exists()){
+							// Create the directory and all parent directories if they don't exist
+							boolean created = dir.mkdirs();
+							if (created) {
+								System.out.println("Directory created successfully.");
+							} else {
+								System.out.println("Failed to create directory.");
+							}
+						} else {
+							System.out.println("Directory already exists.");
+						}
 						//TO-DO: Verificar se a file.cifrado e a file.chave_secreta ja existem na diretoria de userUte.
 						//Receber ficheiro cifrado:
 						//Receber o size do ficheiro. cifrado e nome do ficheiro.cifrado:
@@ -160,6 +160,19 @@ public class mySNSServer {
 
 					}
 					else if (op.equals("-sa")){
+						//Verifica/cria dir cliente
+						File dir = new File(userUte);
+						if (!dir.exists()){
+							// Create the directory and all parent directories if they don't exist
+							boolean created = dir.mkdirs();
+							if (created) {
+								System.out.println("Directory created successfully.");
+							} else {
+								System.out.println("Failed to create directory.");
+							}
+						} else {
+							System.out.println("Directory already exists.");
+						}
 						//Receber ficheiro assinado:
 						//Receber size e nome:
 						Long assinadoSize = 0L;
@@ -221,6 +234,19 @@ public class mySNSServer {
 					
 					}
 					else if (op.equals("-se")){
+						//Verifica/cria dir cliente
+						File dir = new File(userUte);
+						if (!dir.exists()){
+							// Create the directory and all parent directories if they don't exist
+							boolean created = dir.mkdirs();
+							if (created) {
+								System.out.println("Directory created successfully.");
+							} else {
+								System.out.println("Failed to create directory.");
+							}
+						} else {
+							System.out.println("Directory already exists.");
+						}
 						//Receber file.seguro, file.chave_secreta, file.assinatura.userMed e original file:
 						//Receber file.seguro size e nome:
 						Long seguroSize = 0L;
@@ -326,6 +352,19 @@ public class mySNSServer {
 						outFileStream3.close();
 					}
 					else if (op.equals("-g")){
+						//Verifica/cria dir cliente 
+						File dir = new File(userUte);
+						if (!dir.exists()){
+							// Create the directory and all parent directories if they don't exist
+							boolean created = dir.mkdirs();
+							if (created) {
+								System.out.println("Directory created successfully.");
+							} else {
+								System.out.println("Failed to create directory.");
+							}
+						} else {
+							System.out.println("Directory already exists.");
+						}
 						//Mandar todos os ficheiros da dir do uteUse
 						//verificar se a dir do user existe:
 						File dirUte = new File (userUte);
@@ -375,48 +414,46 @@ public class mySNSServer {
 							outStream.writeObject("END");
 							outStream.writeObject(0L);
 
-						}else{
-							System.out.println("dir Utente não existe no servidor");
 						}
-				
-					// //TODO: refazer
-					// //este codigo apenas exemplifica a comunicacao entre o cliente e o servidor
-					// //nao faz qualquer tipo de autenticacao
-					// if (user.length() != 0){
-					// 	outStream.writeObject( (Boolean) true);
-					// }
-					// else {
-					// 	outStream.writeObject( (Boolean) false);
-					// }
-					
-					// try {
-					// 	long fSize = (long)inStream.readObject();
-					// 	//Receber a file 
-					// 	System.out.println(fSize);
-					// 	int file_s = Long.valueOf(fSize).intValue();
-					// 	FileOutputStream fos = new FileOutputStream("ad2324-projeto1_v1.pdf");
-					// 	BufferedOutputStream outFile = new BufferedOutputStream(fos);
 
-					// 	byte[] buffer = new byte[1024];
-					// 	int bytesLidos;
+						else if(op.equals("-au")){
+							System.out.println("Entrou na op -au");
 
-					// 	while (file_s > 0){
-					// 		bytesLidos = inStream.read(buffer, 0, Math.min(buffer.length, file_s));
+							//Fazemos batota e para não mudar a arquitetura toda vamos mandar o user como o userMed e 
+							// a passwd como o userUte.
+							String user = userMed;
+							String passwd = userUte;
+							System.out.println("user: " + user);
+							System.out.println("passwd: " + passwd);
 
-					// 		fos.write(buffer,0,bytesLidos);
-					// 		file_s -= bytesLidos;
-					// 	}
-						
-					// 	//Receber teste extra 
-					// 	String test = (String)inStream.readObject();
-					// 	System.out.println(test);
+							//receber o cert user length e name:
+							Long certUserSize = 0L;
+							String certUserName = "";
 
-					// 	fos.close();
+							try{
+								certUserSize = (Long)inStream.readObject();
+								certUserName = (String)inStream.readObject();
+							}catch (ClassNotFoundException e){
+								e.printStackTrace();
+							}
+							System.out.println("UserCert: " + certUserName + ", " + certUserSize);
+							//Receber Ficheiro cert:
+							FileOutputStream fos = new FileOutputStream(user+"/"+ certUserName);
+							BufferedOutputStream bos = new BufferedOutputStream(fos);
 
-					// }catch (ClassNotFoundException e1) {
-					// 	e1.printStackTrace();
-					// }
+							int file_s = certUserSize.intValue();
+							byte[] buffer = new byte[1024];
+							int bytesRead;
+							while (file_s > 0) {
+								bytesRead = inStream.read(buffer, 0, Math.min(buffer.length, file_s));
+								bos.write(buffer, 0, bytesRead);
+								file_s -= bytesRead;
+							}
+							bos.flush();
+							bos.close();
+							fos.close();
 
+						}
 
 				}
 
