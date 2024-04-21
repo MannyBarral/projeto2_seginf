@@ -243,12 +243,13 @@ public class mySNS {
         String[] serverAdress; 
         String userMed;
         String userUte;
+        String passwd;
         @SuppressWarnings({ "rawtypes", "unchecked" })
         List<String> files = new ArrayList();
 
         String op = "NoOp";
 
-        if (args.length < 11){
+        if (args.length < 10){
             System.out.println("Not enough argunments to run mySNS");
         }else{
             //Parse os Agrs:
@@ -256,10 +257,11 @@ public class mySNS {
             serverAdress = args[1].split(":");
             //guardar userMedico, userUtente e op:
             userMed = args[3];
-            userUte = args[5];
-            op = args[6];
+            passwd = args[5];
+            userUte = args[7];
+            op = args[8];
             //Guarda o nome dos ficheiros
-            for(int i = 7; i < args.length; i++){
+            for(int i = 9; i < args.length; i++){
                 files.add(args[i]);
             }
 
@@ -287,6 +289,7 @@ public class mySNS {
             System.out.println(userMed);
             System.out.println(userUte);
             System.out.println(op);
+            System.out.println("Password: " + passwd);
             System.out.println(files);
 
             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
