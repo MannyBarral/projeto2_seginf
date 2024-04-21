@@ -1,10 +1,20 @@
-correr dentro do diretório src
+correr dentro da diretoria home do projeto (fora do src)
 
-comando para compilar o cliente: javac mySNS.java
-comando para correr o cliente (sc): java mySNS -a 127.0.0.1:23456 -m silva -u maria -sc exame1.png relatorio1.pdf
-comando para correr o cliente (sa): java mySNS -a 127.0.0.1:23456 -m silva -u maria -sa exame1.png relatorio1.pdf
-comando para correr o cliente (se): java mySNS -a 127.0.0.1:23456 -m silva -u maria -se exame1.png relatorio1.pdf
-comando para correr o cliente (g): java mySNS -a 127.0.0.1:23456 -u maria -g exame1.png relatorio1.pdf
+---Cliente---
+comando para compilar o cliente: javac src/mySNS.java
+comando para correr o cliente (sc): java src/mySNS.java -a 127.0.0.1:23456 -m joao -u manel -sc <files>;
+comando para correr o cliente (sa): java src/mySNS.java -a 127.0.0.1:23456 -m joao -u manel -sa <files>;
+comando para correr o cliente (se): java src/mySNS.java -a 127.0.0.1:23456 -m joao -u manel -se <files>;
+comando para correr o cliente (g):  java src/mySNS.java -a 127.0.0.1:23456 -m joao -u manel -g  <files>;
 
-comando para compilar o servidor: javac mySNSServer.java
-comando para correr o servidor: java mySNSServer 23456
+---Servidor---
+comando para compilar o servidor: javac src/mySNSServer.java
+comando para correr o servidor:   java  src/mySNSServer.java <Port> (ex.23456)
+
+---Quick Test---
+Serv:	javac src/mySNSServer.java
+	java src/mySNSServer.java 23456 
+
+CLi: 	javac src/mySNS.java
+	java src/mySNS.java -a 127.0.0.1:23456 -m joao -u manel - sc test.txt relatorio1.pdf exame1.png
+
