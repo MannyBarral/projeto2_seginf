@@ -7,24 +7,66 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.Scanner;
 
 import javax.net.ServerSocketFactory;
 import javax.net.ssl.SSLServerSocketFactory;
 
 public class mySNSServer {
     
-    public static void main (String[] args){
+    public static void main (String[] args) throws Exception{
         System.out.println("servidor: main");
 		mySNSServer server = new mySNSServer();
 		server.startServer();
     }
 
-    public void startServer (){
+    public void startServer () throws Exception{
 		ServerSocket sSoc = null;
+		//Checkar se o users.txt não existe:
+		File users = new File("users.txt");
+		if (!users.exists()){
+			Scanner adminPas = new Scanner(System.in);
+			System.out.println("Please create an admin account; password:");
+			String adminPassword = adminPas.nextLine();
+			System.out.println("Admin password escolhida: " + adminPassword);
+
+			try { //tentar criar users.txt
+				users.createNewFile();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			//Salt da passwordAdmin 
+			SecureRandom rand = new SecureRandom();
+			byte[] salt = new byte[16];
+			rand.nextBytes(salt); //cria um rand e guarda o no objeto salt 
+
+			String hashedPassword = "";
+
+			try {//Tentamos instanciar o message digest com o SHA-512 ???
+				MessageDigest md = MessageDigest.getInstance("SHA-512");
+				md.update(salt);
+				byte[] hashedPasswd = md.digest(adminPassword.getBytes());
+				hashedPassword = Base64.getEncoder().encodeToString(hashedPasswd); //Bytes da hashed password para string
+			} catch (NoSuchAlgorithmException e) {
+				e.printStackTrace();
+			}
+			//escrever a salted e hashed password para o ficheiro users.txt:
+			String guardar = "admin;"+hashedPassword;
+			PrintWriter pw = new PrintWriter(users);
+			pw.println(guardar);
+			pw.flush();
+			pw.close();
+		}
+
         
 		try {
 			//sSoc = new ServerSocket(23456); //Porta de Escuta
@@ -452,6 +494,8 @@ public class mySNSServer {
 							bos.flush();
 							bos.close();
 							fos.close();
+
+							
 
 						}
 
