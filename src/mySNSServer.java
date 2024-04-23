@@ -3,6 +3,7 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -24,7 +25,7 @@ import javax.net.ssl.SSLServerSocketFactory;
 public class mySNSServer {
     
     public static void main (String[] args) throws Exception{
-        System.out.println("servidor: main");
+		System.out.println("servidor: main");
 		mySNSServer server = new mySNSServer();
 		server.startServer();
     }
@@ -60,13 +61,13 @@ public class mySNSServer {
 				e.printStackTrace();
 			}
 			//escrever a salted e hashed password para o ficheiro users.txt:
-			String guardar = "admin;"+ salt +hashedPassword;
+			String guardar = "admin;"+ salt + ";" + hashedPassword;
 			PrintWriter pw = new PrintWriter(users);
 			pw.println(guardar);
 			pw.flush();
 			pw.close();
 		}
-
+		System.out.println("User: Admin guardado \nServidor pronto para connexão com cliente...");
 		try {
 			//sSoc = new ServerSocket(23456); //Porta de Escuta
 			System.setProperty("javax.net.ssl.keyStore", "keystore.server"); 
@@ -494,8 +495,30 @@ public class mySNSServer {
 							bos.close();
 							fos.close();
 
-							
+							//guardar o user no users.txt:
+							//Salt da password:
 
+							SecureRandom rand = new SecureRandom();
+							byte[] salt = new byte[16];
+							rand.nextBytes(salt);
+
+							MessageDigest md = MessageDigest.getInstance("SHA-512");
+							md.update(salt);
+
+							byte[] hashedPasswd = md.digest(passwd.getBytes());
+							String hashedPassword = Base64.getEncoder().encodeToString(hashedPasswd);
+							//Guardar user;salt;saltedPassword no users.txt
+
+							File users = new File("users.txt");
+							if (users.exists()){
+								String guardar = user + ";" + salt + ";" + hashedPassword + "\n";
+								FileWriter fw = new FileWriter(users.getName(), true);
+								fw.write(guardar);
+								fw.flush();
+								fw.close();
+							}else{
+								System.out.println("Erro Crítico: users.txt não existe, porfavor re-inicie o servidor");
+							}
 						}
 
 				}
@@ -505,6 +528,8 @@ public class mySNSServer {
 				socket.close();
 
 			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (NoSuchAlgorithmException e) {
 				e.printStackTrace();
 			}
 		}

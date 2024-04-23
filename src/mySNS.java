@@ -655,6 +655,7 @@ public class mySNS {
 
                 bis.close();
                 fis.close();
+                
 
 
             }else{
