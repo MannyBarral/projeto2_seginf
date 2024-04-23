@@ -60,15 +60,13 @@ public class mySNSServer {
 				e.printStackTrace();
 			}
 			//escrever a salted e hashed password para o ficheiro users.txt:
-			String guardar = "admin;"+hashedPassword;
+			String guardar = "admin;"+ salt +hashedPassword;
 			PrintWriter pw = new PrintWriter(users);
 			pw.println(guardar);
 			pw.flush();
 			pw.close();
 		}
 
-        
-		
 		try {
 			//sSoc = new ServerSocket(23456); //Porta de Escuta
 			System.setProperty("javax.net.ssl.keyStore", "keystore.server"); 
