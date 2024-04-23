@@ -68,6 +68,7 @@ public class mySNSServer {
 		}
 
         
+		
 		try {
 			//sSoc = new ServerSocket(23456); //Porta de Escuta
 			System.setProperty("javax.net.ssl.keyStore", "keystore.server"); 
