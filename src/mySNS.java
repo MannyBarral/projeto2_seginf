@@ -636,35 +636,53 @@ public class mySNS {
             out.writeObject(user);
             out.writeObject(passwd);
 
-            //mandar user.cer para o servidor:
-            File certUser = new File(user+".cer");
-            if (certUser.exists()){
-                //enviar nome e size do certificado:
-                out.writeObject(certUser.length());
-                out.writeObject(certUser.getName());
+            String cerNoServ = "";
 
-                //Enviar Certificado:
-                FileInputStream fis = new FileInputStream(certUser);
-                BufferedInputStream bis = new BufferedInputStream(fis);
-
-                byte[] buffer = new byte[1024];
-                int i = 0; 
-                while ((i = bis.read(buffer, 0, 1024)) > 0) {
-                    out.write(buffer, 0, i);
-                }
-
-                bis.close();
-                fis.close();
-                
-
-
-            }else{
-                System.out.println("certificado do user não existe na diretoria local (criar com a keytool manualmente, e depois exporta-lo da mesma para a diretoria home local)");
+            try{
+                cerNoServ = (String)in.readObject();
+            }catch (ClassNotFoundException e){
+                e.printStackTrace();
             }
+            System.out.println("Recebido do serv na op -au: " + cerNoServ);
+            if(cerNoServ.equals("NOK")){
+                System.out.println(user + ".cer já existe no servidor");
+            }else{
+                //mandar user.cer para o servidor:
+                File certUser = new File(user+".cer");
+                if (certUser.exists()){
+                    //enviar nome e size do certificado:
+                    out.writeObject(certUser.length());
+                    out.writeObject(certUser.getName());
+
+                    //Enviar Certificado:
+                    FileInputStream fis = new FileInputStream(certUser);
+                    BufferedInputStream bis = new BufferedInputStream(fis);
+
+                    byte[] buffer = new byte[1024];
+                    int i = 0; 
+                    while ((i = bis.read(buffer, 0, 1024)) > 0) {
+                        out.write(buffer, 0, i);
+                    }
+
+                    bis.close();
+                    fis.close();
+                }else{
+                    System.out.println("certificado do user não existe na diretoria local (criar com a keytool manualmente, e depois exporta-lo da mesma para a diretoria home local)");
+                }
+            }
+                String recv = "";
+                try{
+                    recv = (String)in.readObject();
+                }catch( Exception e){
+                    e.printStackTrace();
+                }
+                System.out.println(recv);
+            
 
             out.writeObject("END");
             out.writeObject("Dr.END");
             out.writeObject("Mr.END");
+            
     }
         
     }  

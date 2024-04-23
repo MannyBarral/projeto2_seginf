@@ -1,8 +1,10 @@
 import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -468,60 +470,104 @@ public class mySNSServer {
 							System.out.println("user: " + user);
 							System.out.println("passwd: " + passwd);
 
-							//receber o cert user length e name:
-							Long certUserSize = 0L;
-							String certUserName = "";
-
-							try{
-								certUserSize = (Long)inStream.readObject();
-								certUserName = (String)inStream.readObject();
-							}catch (ClassNotFoundException e){
-								e.printStackTrace();
+							//Verificar se a dir do user já existe:
+							File userdir = new File(user);
+							if (!userdir.exists()){
+								// Create the directory and all parent directories if they don't exist
+								boolean created = userdir.mkdirs();
+								if (created) {
+									System.out.println("Directory created successfully.");
+								} else {
+									System.out.println("Failed to create directory.");
+								}
 							}
-							System.out.println("UserCert: " + certUserName + ", " + certUserSize);
-							//Receber Ficheiro cert:
-							FileOutputStream fos = new FileOutputStream(user+"/"+ certUserName);
-							BufferedOutputStream bos = new BufferedOutputStream(fos);
-
-							int file_s = certUserSize.intValue();
-							byte[] buffer = new byte[1024];
-							int bytesRead;
-							while (file_s > 0) {
-								bytesRead = inStream.read(buffer, 0, Math.min(buffer.length, file_s));
-								bos.write(buffer, 0, bytesRead);
-								file_s -= bytesRead;
+							//verificar se o user.cer já existe na dir:
+							File[] filesUser = userdir.listFiles();
+							Boolean existe = false;
+							for (File f : filesUser){
+								if (f.getName().equals(user+".cer")){
+									existe = true;
+								}
 							}
-							bos.flush();
-							bos.close();
-							fos.close();
+							System.out.println("user.cer existe? " + existe);
+							if (!existe){
+								outStream.writeObject("OK");
+
+								//receber o cert user length e name:
+								Long certUserSize = 0L;
+								String certUserName = "";
+
+								try{
+									certUserSize = (Long)inStream.readObject();
+									certUserName = (String)inStream.readObject();
+								}catch (ClassNotFoundException e){
+									e.printStackTrace();
+								}
+								System.out.println("UserCert: " + certUserName + ", " + certUserSize);
+								//Receber Ficheiro cert:
+								FileOutputStream fos = new FileOutputStream(user +"/"+ certUserName);
+								BufferedOutputStream bos = new BufferedOutputStream(fos);
+
+								int file_s = certUserSize.intValue();
+								byte[] buffer = new byte[1024];
+								int bytesRead;
+								while (file_s > 0) {
+									bytesRead = inStream.read(buffer, 0, Math.min(buffer.length, file_s));
+									bos.write(buffer, 0, bytesRead);
+									file_s -= bytesRead;
+								}
+								bos.flush();
+								bos.close();
+								fos.close();
+							}else{
+								outStream.writeObject("NOK");
+								System.out.println(user+".cer já existe na dir: "  + user);
+							}
 
 							//guardar o user no users.txt:
-							//Salt da password:
+							//Verififcar se o user já existe no users.txt: 
+							File usersTxt = new File("users.txt");
+							Boolean userExiste = false;
+							if (usersTxt.exists()){
+								BufferedReader br = new BufferedReader(new FileReader("users.txt"));
+								String userLinha;
 
-							SecureRandom rand = new SecureRandom();
-							byte[] salt = new byte[16];
-							rand.nextBytes(salt);
+								while((userLinha = br.readLine()) != null){
+									if (userLinha.split(";")[0].equals(user)){
+										userExiste = true;
+									}
+								}
+							}else{
+								System.out.println("Erro Critico: users.txt não existe, porfavor re-inicie o servidor");
+							}
+							if (!userExiste){
+								//Salt da password:
+								SecureRandom rand = new SecureRandom();
+								byte[] salt = new byte[16];
+								rand.nextBytes(salt);
 
-							MessageDigest md = MessageDigest.getInstance("SHA-512");
-							md.update(salt);
+								MessageDigest md = MessageDigest.getInstance("SHA-512");
+								md.update(salt);
 
-							byte[] hashedPasswd = md.digest(passwd.getBytes());
-							String hashedPassword = Base64.getEncoder().encodeToString(hashedPasswd);
-							//Guardar user;salt;saltedPassword no users.txt
+								byte[] hashedPasswd = md.digest(passwd.getBytes());
+								String hashedPassword = Base64.getEncoder().encodeToString(hashedPasswd);
 
-							File users = new File("users.txt");
-							if (users.exists()){
+								//Guardar user;salt;saltedPassword no users.txt
+								File users = new File("users.txt");
 								String guardar = user + ";" + salt + ";" + hashedPassword + "\n";
 								FileWriter fw = new FileWriter(users.getName(), true);
 								fw.write(guardar);
 								fw.flush();
 								fw.close();
-							}else{
-								System.out.println("Erro Crítico: users.txt não existe, porfavor re-inicie o servidor");
-							}
-						}
 
-				}
+								outStream.writeObject("Utilizador: " + user + " criado com sucesso!");
+								
+							}else{
+								System.out.println("Utilizador: " + user + " já existe!, porfavor experimente outro username");
+								outStream.writeObject("Utilizador: " + user + " já existe!, porfavor experimente outro username");
+							}
+						}	
+					}
 
 				outStream.close();
 				inStream.close();
