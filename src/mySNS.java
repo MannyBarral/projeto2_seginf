@@ -326,46 +326,58 @@ public class mySNS {
                     out.writeObject(userMed);
                     out.writeObject(userUte);
 
-                    //Verificar que file.cifrado e file.chave_secreta existem:
-                    File cifrado = new File(files.get(f)+".cifrado");
-                    File chave = new File(files.get(f)+".chave_secreta");
-                    if (cifrado.exists() && chave.exists()){
-                        //mandar file_size e file_name:
-                        out.writeObject(cifrado.length());
-                        out.writeObject(cifrado.getName());
-
-                        //mandar file.cifrado:
-                        FileInputStream cfile = new FileInputStream(cifrado);
-                        BufferedInputStream fileC = new BufferedInputStream(cfile);
-
-                        byte[] buffer = new byte[1024];
-                        int t = 0;
-                        while ((t = fileC.read(buffer, 0, 1024)) > 0) {
-                            out.write(buffer, 0, t);
-                        }
-
-                        fileC.close();
-                        cfile.close();
-
-                        //mandar file.chave_secreta:
-                        //mandar size e nome da file.chave_secreta:
-                        out.writeObject(chave.length());
-                        out.writeObject(chave.getName());
-
-                        System.out.println("A Enviar: " + chave.getName() + ", com a size: " + chave.length());
-
-                        //mandar file.chave_secreta:
-                        FileInputStream keyFileInputStream = new FileInputStream(chave);
-
-                        byte[] buf = new byte[(int) chave.length()];
-                        keyFileInputStream.read(buf, 0, buf.length);
-                        out.write(buf, 0, buf.length);
-
-                        keyFileInputStream.close();
-                    }else{
-                        System.out.println(files.get(f)+".cifrado/.chave_secreta não existe na diretoria");
-                        break; //? Aqui secalhar mandamos td a zeros?
+                    //Receber resp da verificação do user:
+                    String continuar = "NOK";
+                    try{
+                        continuar = (String)in.readObject();
+                    }catch(ClassNotFoundException e){
+                        e.printStackTrace();
                     }
+                    if(continuar.equals("OK")){
+                        //Verificar que file.cifrado e file.chave_secreta existem:
+                        File cifrado = new File(files.get(f)+".cifrado");
+                        File chave = new File(files.get(f)+".chave_secreta");
+                        if (cifrado.exists() && chave.exists()){
+                            //mandar file_size e file_name:
+                            out.writeObject(cifrado.length());
+                            out.writeObject(cifrado.getName());
+
+                            //mandar file.cifrado:
+                            FileInputStream cfile = new FileInputStream(cifrado);
+                            BufferedInputStream fileC = new BufferedInputStream(cfile);
+
+                            byte[] buffer = new byte[1024];
+                            int t = 0;
+                            while ((t = fileC.read(buffer, 0, 1024)) > 0) {
+                                out.write(buffer, 0, t);
+                            }
+
+                            fileC.close();
+                            cfile.close();
+
+                            //mandar file.chave_secreta:
+                            //mandar size e nome da file.chave_secreta:
+                            out.writeObject(chave.length());
+                            out.writeObject(chave.getName());
+
+                            System.out.println("A Enviar: " + chave.getName() + ", com a size: " + chave.length());
+
+                            //mandar file.chave_secreta:
+                            FileInputStream keyFileInputStream = new FileInputStream(chave);
+
+                            byte[] buf = new byte[(int) chave.length()];
+                            keyFileInputStream.read(buf, 0, buf.length);
+                            out.write(buf, 0, buf.length);
+
+                            keyFileInputStream.close();
+                        }else{
+                            System.out.println(files.get(f)+".cifrado/.chave_secreta não existe na diretoria");
+                            break; //? Aqui secalhar mandamos td a zeros?
+                        }
+                    }else{
+                        System.out.println("Utilizador " + userMed + " não existe no servidor, por favor crie o utilizador com a opção -au <userName> <password> <user´s certificate> ");
+                    }
+                   
                 }
                 out.writeObject("END");
                 out.writeObject("Dr.END");

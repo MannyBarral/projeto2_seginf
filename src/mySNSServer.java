@@ -149,6 +149,31 @@ public class mySNSServer {
 						} else {
 							System.out.println("Directory already exists.");
 						}
+						//Verifcação de utilizador (med):
+						String user = userMed;
+						//verifica se user está em users.txt:
+						File users = new File("users.txt");
+						if (users.exists()){
+							BufferedReader br = new BufferedReader(new FileReader("users.txt"));
+							String userLinha;
+							Boolean existe = false;
+							while((userLinha = br.readLine()) != null){
+								if (userLinha.split(";")[0].equals(user)){
+									existe = true;
+								}
+							}
+							if (existe){
+								System.out.println(user +" existe nos users.txt");
+								outStream.writeObject("OK");
+							}else{
+								outStream.writeObject("NOK");
+								System.out.println(user + " não existe no users.txt, por favor criar utilizador com opção -au <username> <password> <user´s certifcate>");
+							}
+						}else{
+							System.out.println("Erro Crítico: users.txt não existe porfavor re-inicie o servidor!");
+							outStream.writeObject("NOK");
+						}
+						
 						//TO-DO: Verificar se a file.cifrado e a file.chave_secreta ja existem na diretoria de userUte.
 						//Receber ficheiro cifrado:
 						//Receber o size do ficheiro. cifrado e nome do ficheiro.cifrado:
