@@ -3,6 +3,7 @@ import java.io.BufferedReader;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -13,6 +14,9 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -20,6 +24,15 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Scanner;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.SecureRandom;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.SecretKey;
+import java.security.spec.KeySpec;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 
 import javax.net.ServerSocketFactory;
 import javax.net.ssl.SSLServerSocketFactory;
@@ -31,6 +44,172 @@ public class mySNSServer {
 		mySNSServer server = new mySNSServer();
 		server.startServer();
     }
+
+	//method to retrieve used salt for admin's password hashing from users.txt
+	public static byte[] retrieveSalt(String fileName) throws IOException {
+		Path currentPath = Paths.get(System.getProperty("user.dir"));
+		Path filePath = currentPath.resolve(fileName);
+		File file = filePath.toFile();
+	
+		if (!file.exists()) {
+			throw new FileNotFoundException("File not found: " + file.getAbsolutePath());
+		}
+	
+		List<String> lines = Files.readAllLines(filePath);
+		if (!lines.isEmpty()) {
+			String[] parts = lines.get(0).split(";");
+			return Base64.getDecoder().decode(parts[1]);
+		} else {
+			throw new IOException("The users file is empty, unable to retrieve salt.");
+		}
+	}
+
+	//method to retrieve admin's hashed password from users.txt
+	public static String retrieveHashedPassword(String fileName) throws IOException {
+		Path currentPath = Paths.get(System.getProperty("user.dir"));
+		Path filePath = currentPath.resolve(fileName);
+		File file = filePath.toFile();
+	
+		if (!file.exists()) {
+			throw new FileNotFoundException("File not found: " + file.getAbsolutePath());
+		}
+	
+		List<String> lines = Files.readAllLines(filePath);
+		if (!lines.isEmpty()) {
+			String[] parts = lines.get(0).split(";");
+			return parts[2];
+		} else {
+			throw new IOException("The users file is empty, unable to retrieve hashed password.");
+		}
+	}
+
+	//method to hash a password
+	public static String hashPassword(String inputPassword, byte[] salt) throws NoSuchAlgorithmException {
+		MessageDigest md = MessageDigest.getInstance("SHA-512");
+		md.update(salt);
+		byte[] hashedInputPasswd = md.digest(inputPassword.getBytes());
+		return Base64.getEncoder().encodeToString(hashedInputPasswd);
+	}
+
+	//validate admin password
+	public static void validateAdminPassword(String inputPassword) {
+		try {
+			byte[] salt = retrieveSalt("users.txt");
+			String storedHashedPassword = retrieveHashedPassword("users.txt");
+	
+			// Hash the input password using the same salt
+			String validatedHashedPassword = hashPassword(inputPassword, salt);
+	
+			// Validate password
+			if (validatedHashedPassword.equals(storedHashedPassword)) {
+				System.out.println("Admin password is correct.");
+			} else {
+				System.out.println("Admin password is incorrect.");
+				System.exit(-1);
+			}
+		} catch (IOException | NoSuchAlgorithmException ex) {
+			System.err.println("Error retrieving data or hashing: " + ex.getMessage());
+			ex.printStackTrace();
+		}
+	}
+
+	// Function to derive a symmetric key from the admin's password. we use the same salt as the one used to hash the password
+	public static SecretKey deriveKeyFromPassword(String password) throws Exception{
+	byte[] salt = retrieveSalt("users.txt");  // Call the existing retrieve Salt function
+	int iterations = 65536;  // Number of PBKDF2 hash iterations
+
+	KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, 256); // 256-bit key length
+	SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+
+	return factory.generateSecret(spec);
+    }
+
+	//method to derive a symmetric key from admin's password to use in MAC. receives raw password
+	public static SecretKey deriveKeyFromPassword(String password, byte[] salt, int keyLength) {
+		int iterations = 65536;  // Recommended iteration count for PBKDF2
+		try {
+			// Create a PBEKeySpec with the given parameters
+			KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, 256);  // keylength is 256
+			// Get a SecretKeyFactory for PBKDF2 with HMAC-SHA256
+			SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+			// Generate the secret key
+			return skf.generateSecret(spec);
+		} catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+			throw new RuntimeException("Error during key derivation", e);
+		}
+	}
+
+	// Method to compute and store the MAC for users.txt
+	public static void computeAndStoreMac() throws Exception{
+		Path currentPath = Paths.get(System.getProperty("user.dir"));
+		Path filePath = currentPath.resolve("users.txt");
+		File file = filePath.toFile();
+
+		if (!file.exists()) {
+			throw new FileNotFoundException("File not found: " + file.getAbsolutePath());
+		}
+
+		Mac mac = Mac.getInstance("HmacSHA256");
+		mac.init(deriveKeyFromPassword("abc123"));
+
+		// Read the contents of the file and update the MAC calculation incrementally
+		try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file))) {
+			byte[] buffer = new byte[4096]; // Buffer size of 4KB
+			int numRead;
+			while ((numRead = bis.read(buffer)) != -1) {
+				mac.update(buffer, 0, numRead);
+			}
+		}
+
+		// Complete the MAC computation
+		byte[] macBytes = mac.doFinal();
+
+		// Encode the MAC in Base64 and store it in a separate file
+		String encodedMac = Base64.getEncoder().encodeToString(macBytes);
+		Path macFilePath = currentPath.resolve("users.mac");
+		Files.write(macFilePath, encodedMac.getBytes());
+		System.out.println("MAC stored at: " + macFilePath.toString());
+	}
+
+	 // Method to verify the MAC of the 'users.txt' file
+	 public static boolean verifyMac(SecretKey key) throws Exception {
+        Path currentPath = Paths.get(System.getProperty("user.dir"));
+        Path filePath = currentPath.resolve("users.txt");
+        File file = filePath.toFile();
+
+        if (!file.exists()) {
+            throw new FileNotFoundException("File not found: " + file.getAbsolutePath());
+        }
+
+		 // Retrieve the stored MAC
+		 Path macFilePath = currentPath.resolve("users.txt.mac");
+		 String storedMac = new String(Files.readAllBytes(macFilePath));
+
+		 Mac mac = Mac.getInstance("HmacSHA256");
+		 mac.init(deriveKeyFromPassword("abc123"));
+ 
+		 // Compute the MAC for the current file content
+		 try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file))) {
+			 byte[] buffer = new byte[8192]; // Use a buffer of 8KB
+			 int numRead;
+			 while ((numRead = bis.read(buffer)) != -1) {
+				 mac.update(buffer, 0, numRead);
+			 }
+		 }
+ 
+		 // Finalize the MAC computation
+		 byte[] macBytes = mac.doFinal();
+		 String currentMac = Base64.getEncoder().encodeToString(macBytes);
+ 
+		 // Compare the current MAC with the stored MAC
+		 if (currentMac.equals(storedMac)) {
+			 System.out.println("MAC verification passed. File integrity confirmed.");
+			 return true;
+		 } else {
+			 System.out.println("MAC verification failed. File integrity compromised.");
+			 return false;
+		 }
+	 }
 
     public void startServer () throws Exception{
 		ServerSocket sSoc = null;
@@ -68,6 +247,39 @@ public class mySNSServer {
 			pw.println(guardar);
 			pw.flush();
 			pw.close();
+			//create and store mac
+			computeAndStoreMac();
+		}
+		//se users.txt existe, entao vamos pedir a password do admin
+		if (users.exists()){
+			// Get user input
+			Scanner scanner = new Scanner(System.in);
+			System.out.println("Enter admin password:");
+			String inputPassword = scanner.nextLine();
+			scanner.close();
+
+			//validate admin password
+			validateAdminPassword(inputPassword);
+
+			//see if mac exists and if it does, check if it is valid
+			Path currentPath = Paths.get(System.getProperty("user.dir"));
+			Path macFilePath = currentPath.resolve("users.txt.mac");
+			File macFile = macFilePath.toFile();
+			if (macFile.exists()) {
+				SecretKey key = deriveKeyFromPassword("abc123");
+				verifyMac(key);
+			}
+			//if mac does not exist, ask user if they want to create it
+			else {
+				System.out.println("MAC file not found. Do you want to create it? (y/n)");
+				Scanner macScanner = new Scanner(System.in);
+				String response = macScanner.nextLine();
+				if (response.equals("y")) {
+					computeAndStoreMac();
+				}
+				macScanner.close();
+			}
+			
 		}
 		System.out.println("User: Admin guardado \nServidor pronto para connexão com cliente...");
 		try {
@@ -575,17 +787,13 @@ public class mySNSServer {
 								md.update(salt);
 
 								byte[] hashedPasswd = md.digest(passwd.getBytes());
-								String hashedPassword = Base64.getEncoder().encodeToString(hashedPasswd);
-
-								//Guardar user;salt;saltedPassword no users.txt
-								File users = new File("users.txt");
-								String guardar = user + ";" + salt + ";" + hashedPassword + "\n";
-								FileWriter fw = new FileWriter(users.getName(), true);
-								fw.write(guardar);
-								fw.flush();
-								fw.close();
-
-								outStream.writeObject("Utilizador: " + user + " criado com sucesso!");
+								//update mac
+								try {
+									computeAndStoreMac();
+									System.out.println("Mac atualizado com sucesso!");
+								} catch (Exception e) {
+									e.printStackTrace();
+								}
 								
 							}else{
 								System.out.println("Utilizador: " + user + " já existe!, porfavor experimente outro username");
