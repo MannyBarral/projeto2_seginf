@@ -182,7 +182,7 @@ public class mySNSServer {
         }
 
 		 // Retrieve the stored MAC
-		 Path macFilePath = currentPath.resolve("users.txt.mac");
+		 Path macFilePath = currentPath.resolve("users.mac");
 		 String storedMac = new String(Files.readAllBytes(macFilePath));
 
 		 Mac mac = Mac.getInstance("HmacSHA256");
@@ -230,6 +230,7 @@ public class mySNSServer {
 			SecureRandom rand = new SecureRandom();
 			byte[] salt = new byte[16];
 			rand.nextBytes(salt); //cria um rand e guarda o no objeto salt 
+			String encodedSalt = Base64.getEncoder().encodeToString(salt); //codifica salt para string base64
 
 			String hashedPassword = "";
 
@@ -241,8 +242,9 @@ public class mySNSServer {
 			} catch (NoSuchAlgorithmException e) {
 				e.printStackTrace();
 			}
+
 			//escrever a salted e hashed password para o ficheiro users.txt:
-			String guardar = "admin;"+ salt + ";" + hashedPassword;
+			String guardar = "admin;"+ encodedSalt + ";" + hashedPassword;
 			PrintWriter pw = new PrintWriter(users);
 			pw.println(guardar);
 			pw.flush();
@@ -263,7 +265,7 @@ public class mySNSServer {
 
 			//see if mac exists and if it does, check if it is valid
 			Path currentPath = Paths.get(System.getProperty("user.dir"));
-			Path macFilePath = currentPath.resolve("users.txt.mac");
+			Path macFilePath = currentPath.resolve("users.mac");
 			File macFile = macFilePath.toFile();
 			if (macFile.exists()) {
 				SecretKey key = deriveKeyFromPassword("abc123");
@@ -279,7 +281,7 @@ public class mySNSServer {
 				}
 				macScanner.close();
 			}
-			
+
 		}
 		System.out.println("User: Admin guardado \nServidor pronto para connexão com cliente...");
 		try {
@@ -772,6 +774,10 @@ public class mySNSServer {
 								while((userLinha = br.readLine()) != null){
 									if (userLinha.split(";")[0].equals(user)){
 										userExiste = true;
+										//print de mensagem de erro a dizer que o user já existe
+										System.out.println("Utilizador: " + user + " já existe!");
+										//terminar execucao do programa
+										System.exit(-1);
 									}
 								}
 							}else{
@@ -782,11 +788,19 @@ public class mySNSServer {
 								SecureRandom rand = new SecureRandom();
 								byte[] salt = new byte[16];
 								rand.nextBytes(salt);
+								String encodedSalt = Base64.getEncoder().encodeToString(salt);  //codifica salt para string base64
 
+								// Hash the password with the salt
 								MessageDigest md = MessageDigest.getInstance("SHA-512");
 								md.update(salt);
-
 								byte[] hashedPasswd = md.digest(passwd.getBytes());
+								String encodedHashedPasswd = Base64.getEncoder().encodeToString(hashedPasswd);  // Bytes da hashed password para string base64
+
+								// Write the user and hashed password to the users.txt file
+								FileWriter fw = new FileWriter("users.txt", true);
+								fw.write(user + ";" + encodedSalt + ";" + encodedHashedPasswd + "\n");
+								fw.flush();
+								fw.close();
 								//update mac
 								try {
 									computeAndStoreMac();

@@ -6,7 +6,7 @@ comando para correr o cliente (sc): java src/mySNS.java -a 127.0.0.1:23456 -m jo
 comando para correr o cliente (sa): java src/mySNS.java -a 127.0.0.1:23456 -m joao -p <password> -u manel -sa <files>;
 comando para correr o cliente (se): java src/mySNS.java -a 127.0.0.1:23456 -m joao -p <password> -u manel -se <files>;
 comando para correr o cliente (g):  java src/mySNS.java -a 127.0.0.1:23456 -m joao -p <password> -u manel -g  <files>;
-comando para correr o cliente (au): java src/mySNS.java -a 127.0.0.1:23456 
+comando para correr o cliente (au): java src/mySNS.java -a 127.0.0.1:23456 -au joao joao joao.cer
 
 ---Servidor---
 comando para compilar o servidor: javac src/mySNSServer.java
