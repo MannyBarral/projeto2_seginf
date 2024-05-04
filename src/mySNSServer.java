@@ -249,8 +249,14 @@ public class mySNSServer {
 			pw.println(guardar);
 			pw.flush();
 			pw.close();
-			//create and store mac
-			computeAndStoreMac();
+
+			//perguntar ao admin se quer criar o mac
+			System.out.println("Do you want to create a MAC for the users.txt file? (y/n)");
+			Scanner macScanner = new Scanner(System.in);
+			String response = macScanner.nextLine();
+			if (response.equals("y")) {
+				computeAndStoreMac();
+			}
 		}
 		//se users.txt existe, entao vamos pedir a password do admin
 		if (users.exists()){
@@ -803,12 +809,14 @@ public class mySNSServer {
 								fw.close();
 								//update mac
 								try {
-									computeAndStoreMac();
-									System.out.println("Mac atualizado com sucesso!");
+									//so update mac se ja existir
+									if (Files.exists(Paths.get("users.mac"))) {
+										computeAndStoreMac();
+										System.out.println("Mac atualizado com sucesso!");
+									}
 								} catch (Exception e) {
 									e.printStackTrace();
 								}
-								
 							}else{
 								System.out.println("Utilizador: " + user + " já existe!, porfavor experimente outro username");
 								outStream.writeObject("Utilizador: " + user + " já existe!, porfavor experimente outro username");
