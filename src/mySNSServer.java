@@ -45,8 +45,8 @@ public class mySNSServer {
 		server.startServer();
     }
 
-	//method to retrieve used salt for admin's password hashing from users.txt
-	public static byte[] retrieveSalt(String fileName) throws IOException {
+	//method to retrieve used salt for password hashing from users.txt
+	public static byte[] retrievePasswordSalt(String fileName, String user) throws IOException {
 		Path currentPath = Paths.get(System.getProperty("user.dir"));
 		Path filePath = currentPath.resolve(fileName);
 		File file = filePath.toFile();
@@ -57,15 +57,22 @@ public class mySNSServer {
 	
 		List<String> lines = Files.readAllLines(filePath);
 		if (!lines.isEmpty()) {
-			String[] parts = lines.get(0).split(";");
-			return Base64.getDecoder().decode(parts[1]);
+			for (String line : lines) {
+				String[] parts = line.split(";");
+				if (parts[0].equals(user)) {
+					return Base64.getDecoder().decode(parts[1]);
+				}
+			}
+			// If no matching user is found
+			throw new IllegalArgumentException("User não encontrado " + user);
 		} else {
-			throw new IOException("The users file is empty, unable to retrieve salt.");
+			throw new IOException("o ficheiro users.txt esta vazio. nao foi possivel encontrar o salt da password");
 		}
 	}
+	
 
-	//method to retrieve admin's hashed password from users.txt
-	public static String retrieveHashedPassword(String fileName) throws IOException {
+	//method to retrieve hashed password from users.txt
+	public static String retrieveHashedPassword(String fileName, String user) throws IOException {
 		Path currentPath = Paths.get(System.getProperty("user.dir"));
 		Path filePath = currentPath.resolve(fileName);
 		File file = filePath.toFile();
@@ -76,12 +83,19 @@ public class mySNSServer {
 	
 		List<String> lines = Files.readAllLines(filePath);
 		if (!lines.isEmpty()) {
-			String[] parts = lines.get(0).split(";");
-			return parts[2];
+			for (String line : lines) {
+				String[] parts = line.split(";");
+				if (parts[0].equals(user)) {
+					return parts[2];
+				}
+			}
+			// If no matching user is found
+			throw new IllegalArgumentException("User não encontrado: " + user);
 		} else {
-			throw new IOException("The users file is empty, unable to retrieve hashed password.");
+			throw new IOException("o ficheiro users.txt esta vazio. nao foi possivel encontrar a password hashada.");
 		}
 	}
+	
 
 	//method to hash a password
 	public static String hashPassword(String inputPassword, byte[] salt) throws NoSuchAlgorithmException {
@@ -91,31 +105,32 @@ public class mySNSServer {
 		return Base64.getEncoder().encodeToString(hashedInputPasswd);
 	}
 
-	//validate admin password
-	public static void validateAdminPassword(String inputPassword) {
+	//validate password
+	public static void validatePassword(String inputPassword, String user) {
 		try {
-			byte[] salt = retrieveSalt("users.txt");
-			String storedHashedPassword = retrieveHashedPassword("users.txt");
+			byte[] salt = retrievePasswordSalt("users.txt", user);
+			String storedHashedPassword = retrieveHashedPassword("users.txt", user);
 	
 			// Hash the input password using the same salt
 			String validatedHashedPassword = hashPassword(inputPassword, salt);
 	
 			// Validate password
 			if (validatedHashedPassword.equals(storedHashedPassword)) {
-				System.out.println("Admin password is correct.");
+				System.out.println(user + " password correta.");
 			} else {
-				System.out.println("Admin password is incorrect.");
+				System.out.println(user + " password incorreta.");
 				System.exit(-1);
 			}
 		} catch (IOException | NoSuchAlgorithmException ex) {
-			System.err.println("Error retrieving data or hashing: " + ex.getMessage());
+			System.err.println("erro ao ir buscar os dados ou a hashing: " + ex.getMessage());
 			ex.printStackTrace();
 		}
 	}
 
-	// Function to derive a symmetric key from the admin's password. we use the same salt as the one used to hash the password
-	public static SecretKey deriveKeyFromPassword(String password) throws Exception{
-	byte[] salt = retrieveSalt("users.txt");  // Call the existing retrieve Salt function
+	//metodo para derivar a chave simetrica da password do admin. usamos o mesmo salt que foi usado para fazer a hash da password
+	//recebe a password em plain text
+	public static SecretKey deriveKeyFromPassword(String password, String user) throws Exception{
+	byte[] salt = retrievePasswordSalt("users.txt", user);  // Call the existing retrieve Salt function
 	int iterations = 65536;  // Number of PBKDF2 hash iterations
 
 	KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, iterations, 256); // 256-bit key length
@@ -124,8 +139,8 @@ public class mySNSServer {
 	return factory.generateSecret(spec);
     }
 
-	//method to derive a symmetric key from admin's password to use in MAC. receives raw password
-	public static SecretKey deriveKeyFromPassword(String password, byte[] salt, int keyLength) {
+	//metodo para derivar a chave simetrica da password do admin para usar no MAC. recebe a password em plain text e o salt
+	public static SecretKey deriveKeyFromPassword(String password, byte[] salt) {
 		int iterations = 65536;  // Recommended iteration count for PBKDF2
 		try {
 			// Create a PBEKeySpec with the given parameters
@@ -149,8 +164,9 @@ public class mySNSServer {
 			throw new FileNotFoundException("File not found: " + file.getAbsolutePath());
 		}
 
+		byte[] salt = retrievePasswordSalt("users.txt", "admin"); //salt da password do admin
 		Mac mac = Mac.getInstance("HmacSHA256");
-		mac.init(deriveKeyFromPassword("abc123"));
+		mac.init(deriveKeyFromPassword("abc123", salt));
 
 		// Read the contents of the file and update the MAC calculation incrementally
 		try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file))) {
@@ -172,7 +188,7 @@ public class mySNSServer {
 	}
 
 	 // Method to verify the MAC of the 'users.txt' file
-	 public static boolean verifyMac(SecretKey key) throws Exception {
+	 public static boolean verifyMac() throws Exception {
         Path currentPath = Paths.get(System.getProperty("user.dir"));
         Path filePath = currentPath.resolve("users.txt");
         File file = filePath.toFile();
@@ -185,8 +201,9 @@ public class mySNSServer {
 		 Path macFilePath = currentPath.resolve("users.mac");
 		 String storedMac = new String(Files.readAllBytes(macFilePath));
 
+		 byte[] salt = retrievePasswordSalt("users.txt", "admin"); //salt da password do admin
 		 Mac mac = Mac.getInstance("HmacSHA256");
-		 mac.init(deriveKeyFromPassword("abc123"));
+		 mac.init(deriveKeyFromPassword("abc123", salt));
  
 		 // Compute the MAC for the current file content
 		 try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file))) {
@@ -203,13 +220,58 @@ public class mySNSServer {
  
 		 // Compare the current MAC with the stored MAC
 		 if (currentMac.equals(storedMac)) {
-			 System.out.println("MAC verification passed. File integrity confirmed.");
+			 System.out.println("verificacao do MAC bem sucedida. Ficheiro integro.");
 			 return true;
 		 } else {
-			 System.out.println("MAC verification failed. File integrity compromised.");
+			 System.out.println("verificacao do MAC falhou. Ficheiro corrompido.");
 			 return false;
 		 }
 	 }
+
+	// metodo para verificar se o utilizador existe no users.txt
+	//depois usar validatePassword para verificar a password
+	 public static boolean verificaUser(String user, ObjectOutputStream outStream) {
+        File users = new File("users.txt");
+
+        // Verifica se o arquivo existe antes de tentar ler
+        if (!users.exists()) {
+            System.out.println("Erro Crítico: users.txt não existe, por favor reinicie o servidor!");
+            try {
+                outStream.writeObject("NOK");
+            } catch (IOException e) {
+                System.out.println("Erro ao enviar resposta ao cliente: " + e.getMessage());
+            }
+            return false;
+        }
+
+        // Procede com a verificação do usuário se o arquivo existe
+        try (BufferedReader br = new BufferedReader(new FileReader(users))) {
+            String userLinha;
+            while ((userLinha = br.readLine()) != null) {
+                if (userLinha.split(";")[0].equals(user)) {
+                    System.out.println(user + " existe nos users.txt");
+                    outStream.writeObject("OK");
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("Erro ao ler o ficheiro users.txt: " + e.getMessage());
+            try {
+                outStream.writeObject("NOK");
+            } catch (IOException ioException) {
+                System.out.println("Erro ao enviar resposta ao cliente: " + ioException.getMessage());
+            }
+        }
+
+        System.out.println(user + " não existe no users.txt, por favor criar utilizador com opção -au <username> <password> <user´s certifcate>");
+        try {
+            outStream.writeObject("NOK");
+        } catch (IOException e) {
+            System.out.println("Erro ao enviar resposta ao cliente: " + e.getMessage());
+        }
+        return false;
+    }
+
 
     public void startServer () throws Exception{
 		ServerSocket sSoc = null;
@@ -267,15 +329,16 @@ public class mySNSServer {
 			scanner.close();
 
 			//validate admin password
-			validateAdminPassword(inputPassword);
+			validatePassword(inputPassword, "admin");
 
 			//see if mac exists and if it does, check if it is valid
 			Path currentPath = Paths.get(System.getProperty("user.dir"));
 			Path macFilePath = currentPath.resolve("users.mac");
 			File macFile = macFilePath.toFile();
 			if (macFile.exists()) {
-				SecretKey key = deriveKeyFromPassword("abc123");
-				verifyMac(key);
+				byte[] salt = retrievePasswordSalt("users.txt", "admin");
+				SecretKey key = deriveKeyFromPassword("abc123", salt);
+				verifyMac();
 			}
 			//if mac does not exist, ask user if they want to create it
 			else {
@@ -369,31 +432,18 @@ public class mySNSServer {
 						} else {
 							System.out.println("Directory already exists.");
 						}
+
 						//Verifcação de utilizador (med):
 						String user = userMed;
-						//verifica se user está em users.txt:
+						//verifica se user está em users.txt e se a password está correta:
 						File users = new File("users.txt");
-						if (users.exists()){
-							BufferedReader br = new BufferedReader(new FileReader("users.txt"));
-							String userLinha;
-							Boolean existe = false;
-							while((userLinha = br.readLine()) != null){
-								if (userLinha.split(";")[0].equals(user)){
-									existe = true;
-								}
-							}
-							if (existe){
-								System.out.println(user +" existe nos users.txt");
-								outStream.writeObject("OK");
-							}else{
-								outStream.writeObject("NOK");
-								System.out.println(user + " não existe no users.txt, por favor criar utilizador com opção -au <username> <password> <user´s certifcate>");
-							}
-						}else{
-							System.out.println("Erro Crítico: users.txt não existe porfavor re-inicie o servidor!");
-							outStream.writeObject("NOK");
-						}
-						
+						if (!verificaUser(user, outStream) == true) {
+							System.out.println("Utilizador não existe no users.txt");
+							System.exit(-1);
+							//validar password
+							validatePassword(userMed, user);
+							}	
+						System.out.println("Utilizador: " + user + " validado com sucesso!");
 						//TO-DO: Verificar se a file.cifrado e a file.chave_secreta ja existem na diretoria de userUte.
 						//Receber ficheiro cifrado:
 						//Receber o size do ficheiro. cifrado e nome do ficheiro.cifrado:
@@ -446,7 +496,6 @@ public class mySNSServer {
 			
 						outStream.flush();
 
-
 					}
 					else if (op.equals("-sa")){
 						//Verifica/cria dir cliente
@@ -462,6 +511,17 @@ public class mySNSServer {
 						} else {
 							System.out.println("Directory already exists.");
 						}
+							//Verifcação de utilizador (med):
+							String user = userMed;
+							//verifica se user está em users.txt e se a password está correta:
+							File users = new File("users.txt");
+							if (!verificaUser(user, outStream) == true) {
+								System.out.println("Utilizador não existe no users.txt");
+								System.exit(-1);
+								//validar password
+								validatePassword(userMed, user);
+								}	
+							System.out.println("Utilizador: " + user + " validado com sucesso!");
 						//Receber ficheiro assinado:
 						//Receber size e nome:
 						Long assinadoSize = 0L;
@@ -536,6 +596,17 @@ public class mySNSServer {
 						} else {
 							System.out.println("Directory already exists.");
 						}
+						//Verifcação de utilizador (med):
+						String user = userMed;
+						//verifica se user está em users.txt e se a password está correta:
+						File users = new File("users.txt");
+						if (!verificaUser(user, outStream) == true) {
+							System.out.println("Utilizador não existe no users.txt");
+							System.exit(-1);
+							//validar password
+							validatePassword(userMed, user);
+							}	
+						System.out.println("Utilizador: " + user + " validado com sucesso!");
 						//Receber file.seguro, file.chave_secreta, file.assinatura.userMed e original file:
 						//Receber file.seguro size e nome:
 						Long seguroSize = 0L;
@@ -654,6 +725,17 @@ public class mySNSServer {
 						} else {
 							System.out.println("Directory already exists.");
 						}
+						//Verifcação de utilizador (med):
+						String user = userMed;
+						//verifica se user está em users.txt e se a password está correta:
+						File users = new File("users.txt");
+						if (!verificaUser(user, outStream) == true) {
+							System.out.println("Utilizador não existe no users.txt");
+							System.exit(-1);
+							//validar password
+							validatePassword(userMed, user);
+							}	
+						System.out.println("Utilizador: " + user + " validado com sucesso!");
 						//Mandar todos os ficheiros da dir do uteUse
 						//verificar se a dir do user existe:
 						File dirUte = new File (userUte);
